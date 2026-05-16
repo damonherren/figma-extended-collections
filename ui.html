@@ -478,7 +478,7 @@ function renderVarTable() {
     renderValueInput(wrap, v, modeId, rawValue, overridden);
 
     row.querySelector('.btn-reset').addEventListener('click', () => {
-      send({ type: 'REMOVE_OVERRIDE', collectionId: state.collection.id, variableId: v.id });
+      send({ type: 'REMOVE_OVERRIDE', collectionId: state.collection.id, variableId: v.id, modeId });
     });
 
     table.appendChild(row);

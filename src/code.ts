@@ -16,7 +16,7 @@ type UIMessage =
   | { type: 'CREATE'; collectionKey: string; name: string }
   | { type: 'SELECT'; collectionId: string }
   | { type: 'SET_OVERRIDE'; variableId: string; modeId: string; value: VariableValue }
-  | { type: 'REMOVE_OVERRIDE'; collectionId: string; variableId: string }
+  | { type: 'REMOVE_OVERRIDE'; collectionId: string; variableId: string; modeId: string }
   | { type: 'COPY_OVERRIDES'; srcId: string; dstId: string }
   | { type: 'CLOSE' };
 
@@ -94,8 +94,19 @@ async function handleRemoveOverride(msg: Extract<UIMessage, { type: 'REMOVE_OVER
     figma.variables.getVariableByIdAsync(msg.variableId),
   ]);
   if (!col || !variable) throw new Error('Collection or variable not found.');
-  (col as unknown as ExtendedVariableCollectionExt).removeOverridesForVariable(variable);
-  await sendCollectionReady(col as unknown as ExtendedVariableCollectionExt);
+
+  const ext = col as unknown as ExtendedVariableCollectionExt;
+  const overrides = ext.variableOverrides ?? {};
+  const otherModeOverrides = Object.entries(overrides[variable.id] ?? {})
+    .filter(([modeId]) => modeId !== msg.modeId);
+
+  // The API only removes all modes at once, so we clear then re-apply the other modes.
+  ext.removeOverridesForVariable(variable);
+  for (const [modeId, value] of otherModeOverrides) {
+    variable.setValueForMode(modeId, value);
+  }
+
+  await sendCollectionReady(ext);
 }
 
 async function handleCopyOverrides(msg: Extract<UIMessage, { type: 'COPY_OVERRIDES' }>) {

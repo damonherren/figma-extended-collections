@@ -481,7 +481,7 @@ function renderVarTable() {
     renderValueInput(wrap, v, modeId, rawValue, overridden);
 
     row.querySelector('.btn-reset').addEventListener('click', () => {
-      send({ type: 'REMOVE_OVERRIDE', collectionId: state.collection.id, variableId: v.id });
+      send({ type: 'REMOVE_OVERRIDE', collectionId: state.collection.id, variableId: v.id, modeId });
     });
 
     table.appendChild(row);
@@ -726,13 +726,20 @@ send({ type: 'INIT' });
     variable.setValueForMode(msg.modeId, msg.value);
   }
   async function handleRemoveOverride(msg) {
+    var _a, _b;
     const [col, variable] = await Promise.all([
       figma.variables.getVariableCollectionByIdAsync(msg.collectionId),
       figma.variables.getVariableByIdAsync(msg.variableId)
     ]);
     if (!col || !variable) throw new Error("Collection or variable not found.");
-    col.removeOverridesForVariable(variable);
-    await sendCollectionReady(col);
+    const ext = col;
+    const overrides = (_a = ext.variableOverrides) != null ? _a : {};
+    const otherModeOverrides = Object.entries((_b = overrides[variable.id]) != null ? _b : {}).filter(([modeId]) => modeId !== msg.modeId);
+    ext.removeOverridesForVariable(variable);
+    for (const [modeId, value] of otherModeOverrides) {
+      variable.setValueForMode(modeId, value);
+    }
+    await sendCollectionReady(ext);
   }
   async function handleCopyOverrides(msg) {
     var _a;
