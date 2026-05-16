@@ -471,13 +471,13 @@ function renderVarTable() {
         <strong>\${esc(label)}</strong>
         \${group ? \`<span>\${esc(group)}</span>\` : ''}
       </div>
-      <div class="var-input-wrap" id="input-wrap-\${v.id}"></div>
+      <div class="var-input-wrap"></div>
       <button class="btn-reset\${overridden ? '' : ' hidden'}"
               data-var="\${v.id}"
               title="Reset to inherited value">\u21A9</button>
     \`;
 
-    const wrap = row.querySelector(\`#input-wrap-\${v.id}\`);
+    const wrap = row.querySelector('.var-input-wrap');
     renderValueInput(wrap, v, modeId, rawValue, overridden);
 
     row.querySelector('.btn-reset').addEventListener('click', () => {
