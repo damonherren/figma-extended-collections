@@ -350,6 +350,15 @@ function send(msg) {
   parent.postMessage({ pluginMessage: msg }, '*');
 }
 
+function commitOverride(variableId, modeId, value) {
+  send({ type: 'SET_OVERRIDE', variableId, modeId, value });
+  const entry = state.vars.find(v => v.id === variableId);
+  if (entry) {
+    entry.valuesByMode[modeId] = value;
+    if (!entry.overriddenModes.includes(modeId)) entry.overriddenModes.push(modeId);
+  }
+}
+
 window.onmessage = (event) => {
   const msg = event.data.pluginMessage;
   if (!msg) return;
@@ -525,7 +534,7 @@ function renderColorInput(wrap, variable, modeId, value) {
   function commit() {
     const rgb  = hexToRgb(colorPicker.value);
     const alpha = parseInt(alphaSlider.value, 10) / 100;
-    send({ type: 'SET_OVERRIDE', variableId: variable.id, modeId, value: { ...rgb, a: alpha } });
+    commitOverride(variable.id, modeId, { ...rgb, a: alpha });
   }
 
   colorPicker.addEventListener('input', () => {
@@ -553,7 +562,7 @@ function renderFloatInput(wrap, variable, modeId, value) {
   input.value = typeof value === 'number' ? value : 0;
   input.step  = 'any';
   input.addEventListener('change', () => {
-    send({ type: 'SET_OVERRIDE', variableId: variable.id, modeId, value: parseFloat(input.value) });
+    commitOverride(variable.id, modeId, parseFloat(input.value));
   });
   wrap.appendChild(input);
 }
@@ -565,7 +574,7 @@ function renderStringInput(wrap, variable, modeId, value) {
   input.type  = 'text';
   input.value = typeof value === 'string' ? value : '';
   input.addEventListener('change', () => {
-    send({ type: 'SET_OVERRIDE', variableId: variable.id, modeId, value: input.value });
+    commitOverride(variable.id, modeId, input.value);
   });
   wrap.appendChild(input);
 }
@@ -577,7 +586,7 @@ function renderBoolInput(wrap, variable, modeId, value) {
   input.type    = 'checkbox';
   input.checked = Boolean(value);
   input.addEventListener('change', () => {
-    send({ type: 'SET_OVERRIDE', variableId: variable.id, modeId, value: input.checked });
+    commitOverride(variable.id, modeId, input.checked);
   });
   wrap.appendChild(input);
 }
