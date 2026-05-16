@@ -785,19 +785,44 @@ send({ type: 'INIT' });
     var _a;
     const vars = await getVarsForCollection(col);
     const overrides = (_a = col.variableOverrides) != null ? _a : {};
+    const parentVarByKey = /* @__PURE__ */ new Map();
+    try {
+      const parentCol = await figma.variables.getVariableCollectionByIdAsync(
+        col.parentVariableCollectionId
+      );
+      if (parentCol) {
+        const libVars = await figma.variables.getVariablesInLibraryCollectionAsync(parentCol.key);
+        for (const lv of libVars) parentVarByKey.set(lv.key, lv);
+      }
+    } catch (e) {
+    }
     figma.ui.postMessage({
       type: "COLLECTION_READY",
       collection: { id: col.id, name: col.name },
       modes: col.modes,
       vars: vars.map((v) => {
-        var _a2;
+        var _a2, _b;
+        const varOverrides = (_a2 = overrides[v.id]) != null ? _a2 : {};
+        const parentVar = parentVarByKey.get(v.key);
+        const effectiveValues = {};
+        for (const mode of col.modes) {
+          if (mode.modeId in varOverrides) {
+            effectiveValues[mode.modeId] = varOverrides[mode.modeId];
+          } else if (parentVar && mode.parentModeId) {
+            const parentVal = parentVar.valuesByMode[mode.parentModeId];
+            if (parentVal !== void 0) effectiveValues[mode.modeId] = parentVal;
+          } else {
+            const raw = (_b = v.valuesByMode[mode.modeId]) != null ? _b : mode.parentModeId ? v.valuesByMode[mode.parentModeId] : void 0;
+            if (raw !== void 0) effectiveValues[mode.modeId] = raw;
+          }
+        }
         return {
           id: v.id,
           name: v.name,
           key: v.key,
           resolvedType: v.resolvedType,
-          valuesByMode: v.valuesByMode,
-          overriddenModes: Object.keys((_a2 = overrides[v.id]) != null ? _a2 : {})
+          valuesByMode: effectiveValues,
+          overriddenModes: Object.keys(varOverrides)
         };
       })
     });

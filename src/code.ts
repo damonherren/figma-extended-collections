@@ -165,18 +165,55 @@ async function sendCollectionReady(col: ExtendedVariableCollectionExt) {
   const vars = await getVarsForCollection(col);
   const overrides = col.variableOverrides ?? {};
 
+  // Fetch parent library variables so we can display inherited (non-overridden) values.
+  // Inherited variables carry no values of their own — the base values live in the parent.
+  const parentVarByKey = new Map<string, LibraryVariable>();
+  try {
+    const parentCol = await figma.variables.getVariableCollectionByIdAsync(
+      col.parentVariableCollectionId
+    );
+    if (parentCol) {
+      const libVars = await figma.variables.getVariablesInLibraryCollectionAsync(parentCol.key);
+      for (const lv of libVars) parentVarByKey.set(lv.key, lv);
+    }
+  } catch {
+    // Parent inaccessible — fall back to raw valuesByMode below
+  }
+
   figma.ui.postMessage({
     type: 'COLLECTION_READY',
     collection: { id: col.id, name: col.name },
     modes: col.modes,
-    vars: vars.map(v => ({
-      id: v.id,
-      name: v.name,
-      key: v.key,
-      resolvedType: v.resolvedType,
-      valuesByMode: v.valuesByMode,
-      overriddenModes: Object.keys(overrides[v.id] ?? {}),
-    })),
+    vars: vars.map(v => {
+      const varOverrides = overrides[v.id] ?? {};
+      const parentVar   = parentVarByKey.get(v.key);
+
+      // Build effective values keyed by the extended collection's local mode IDs.
+      // Priority: override → parent library value → raw valuesByMode (fallback)
+      const effectiveValues: Record<string, VariableValue> = {};
+      for (const mode of col.modes) {
+        if (mode.modeId in varOverrides) {
+          effectiveValues[mode.modeId] = varOverrides[mode.modeId];
+        } else if (parentVar && mode.parentModeId) {
+          const parentVal = parentVar.valuesByMode[mode.parentModeId];
+          if (parentVal !== undefined) effectiveValues[mode.modeId] = parentVal;
+        } else {
+          // Last resort: try both local and parent mode IDs on the raw variable
+          const raw = v.valuesByMode[mode.modeId]
+            ?? (mode.parentModeId ? v.valuesByMode[mode.parentModeId] : undefined);
+          if (raw !== undefined) effectiveValues[mode.modeId] = raw;
+        }
+      }
+
+      return {
+        id: v.id,
+        name: v.name,
+        key: v.key,
+        resolvedType: v.resolvedType,
+        valuesByMode: effectiveValues,
+        overriddenModes: Object.keys(varOverrides),
+      };
+    }),
   });
 }
 
