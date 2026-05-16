@@ -108,9 +108,10 @@ async function handleCopyOverrides(msg: Extract<UIMessage, { type: 'COPY_OVERRID
   const srcExt = srcCol as unknown as ExtendedVariableCollectionExt;
   const dstExt = dstCol as unknown as ExtendedVariableCollectionExt;
 
-  const allVars = await figma.variables.getLocalVariablesAsync();
-  const srcVars = allVars.filter(v => v.variableCollectionId === msg.srcId);
-  const dstVars = allVars.filter(v => v.variableCollectionId === msg.dstId);
+  const [srcVars, dstVars] = await Promise.all([
+    getVarsForCollection(srcExt),
+    getVarsForCollection(dstExt),
+  ]);
 
   const idToKey = new Map(srcVars.map(v => [v.id, v.key]));
   const keyToId = new Map(dstVars.map(v => [v.key, v.id]));
@@ -153,9 +154,15 @@ async function handleCopyOverrides(msg: Extract<UIMessage, { type: 'COPY_OVERRID
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+async function getVarsForCollection(col: ExtendedVariableCollectionExt): Promise<Variable[]> {
+  const results = await Promise.all(
+    col.variableIds.map(id => figma.variables.getVariableByIdAsync(id))
+  );
+  return results.filter((v): v is Variable => v !== null);
+}
+
 async function sendCollectionReady(col: ExtendedVariableCollectionExt) {
-  const allVars = await figma.variables.getLocalVariablesAsync();
-  const vars = allVars.filter(v => v.variableCollectionId === col.id);
+  const vars = await getVarsForCollection(col);
   const overrides = col.variableOverrides ?? {};
 
   figma.ui.postMessage({

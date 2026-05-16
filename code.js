@@ -743,9 +743,10 @@ send({ type: 'INIT' });
     if (!srcCol || !dstCol) throw new Error("Collection not found.");
     const srcExt = srcCol;
     const dstExt = dstCol;
-    const allVars = await figma.variables.getLocalVariablesAsync();
-    const srcVars = allVars.filter((v) => v.variableCollectionId === msg.srcId);
-    const dstVars = allVars.filter((v) => v.variableCollectionId === msg.dstId);
+    const [srcVars, dstVars] = await Promise.all([
+      getVarsForCollection(srcExt),
+      getVarsForCollection(dstExt)
+    ]);
     const idToKey = new Map(srcVars.map((v) => [v.id, v.key]));
     const keyToId = new Map(dstVars.map((v) => [v.key, v.id]));
     const srcModeToParent = new Map(
@@ -774,10 +775,15 @@ send({ type: 'INIT' });
     }
     await sendCollectionReady(dstExt);
   }
+  async function getVarsForCollection(col) {
+    const results = await Promise.all(
+      col.variableIds.map((id) => figma.variables.getVariableByIdAsync(id))
+    );
+    return results.filter((v) => v !== null);
+  }
   async function sendCollectionReady(col) {
     var _a;
-    const allVars = await figma.variables.getLocalVariablesAsync();
-    const vars = allVars.filter((v) => v.variableCollectionId === col.id);
+    const vars = await getVarsForCollection(col);
     const overrides = (_a = col.variableOverrides) != null ? _a : {};
     figma.ui.postMessage({
       type: "COLLECTION_READY",
